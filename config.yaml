@@ -1,0 +1,17 @@
+name: "Household Calendar"
+slug: "household_calendar"
+description: "A local, bill-focused weekly calendar for Home Assistant"
+version: "0.1.0"
+startup: application
+boot: auto
+homeassistant: ">=2024.12.0"
+homeassistant_api: true
+arch:
+  - amd64
+  - aarch64
+map:
+  - config:rw
+options:
+  timezone: "Europe/Warsaw"
+schema:
+  timezone: str
