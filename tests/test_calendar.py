@@ -52,6 +52,18 @@ class CalendarDatabaseTests(unittest.TestCase):
         self.assertEqual(len(march_events), 1)
         self.assertFalse(march_events[0]["paid"])
 
+    def test_one_time_event_does_not_recur(self) -> None:
+        self.db.create_event("One-time repair", date(2025, 3, 5), 0)
+
+        self.assertEqual(self.db.events_for_week(date(2025, 3, 3))[0]["title"], "One-time repair")
+        self.assertEqual(self.db.events_for_week(date(2025, 4, 7)), [])
+
+    def test_paid_state_rejects_date_outside_event_schedule(self) -> None:
+        netflix_id = self.db.create_event("Netflix", date(2025, 1, 31), 1)
+
+        with self.assertRaises(ValueError):
+            self.db.set_paid(netflix_id, date(2025, 3, 30), True)
+
 
 class RecurrenceTests(unittest.TestCase):
     def test_month_end_fallback_returns_to_anchor_day(self) -> None:

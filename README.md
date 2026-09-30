@@ -10,6 +10,16 @@ A Home Assistant add-on for a weekly, day-grouped calendar of household events s
 - Paid state belongs to an individual occurrence. Marking one occurrence paid leaves later occurrences unpaid.
 - Event entry and editing are a later step. The initial database separates recurring event definitions from dated occurrences so that entry methods can be added without changing the calendar model.
 
+## Lovelace card
+
+The add-on copies and registers its card automatically. Add a manual card to a dashboard with:
+
+```yaml
+type: custom:household-calendar-card
+```
+
+The add-on publishes the displayed week as `sensor.household_calendar_week`. The card asks the add-on for other weeks and sends paid-state changes over Home Assistant's authenticated WebSocket event bus. The add-on writes each paid-state change to the local SQLite database and republishes that week.
+
 ## Add-on development
 
 The add-on manifest is `config.yaml`. Home Assistant provides its Supervisor token, options file, and persistent `/data` directory. Run locally with Home Assistant's add-on build tooling; the container is not intended to run without Supervisor credentials.

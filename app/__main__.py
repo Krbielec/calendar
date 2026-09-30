@@ -6,12 +6,18 @@ import logging
 import os
 import signal
 from pathlib import Path
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from .database import Database
+from .home_assistant import HomeAssistantBridge
 
 LOG = logging.getLogger("household_calendar")
 OPTIONS_PATH = Path("/data/options.json")
 DATABASE_PATH = Path("/data/calendar.sqlite3")
+CARD_SOURCE = Path("/app/www/household-calendar-card.js")
+CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
+ADDON_VERSION = "0.1.0"
 
 
 async def run() -> None:
@@ -29,11 +35,17 @@ async def run() -> None:
     db.initialize()
     LOG.info("Database ready; configured timezone: %s", options["timezone"])
 
+    CARD_DESTINATION.parent.mkdir(parents=True, exist_ok=True)
+    CARD_DESTINATION.write_bytes(CARD_SOURCE.read_bytes())
+
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stopped.set)
-    await stopped.wait()
+
+    bridge = HomeAssistantBridge(db, options["timezone"], ADDON_VERSION)
+    await bridge.publish_week(datetime.now(ZoneInfo(options["timezone"])).date())
+    await bridge.run(stopped)
 
 
 if __name__ == "__main__":

@@ -76,13 +76,14 @@ class Database:
         sunday = date.fromordinal(monday.toordinal() + 6)
         with self.session() as conn:
             definitions = conn.execute(
-                "SELECT id, title, first_due_date, interval_months FROM recurring_events WHERE active = 1"
+                "SELECT id, title, first_due_date, frequency, interval_months "
+                "FROM recurring_events WHERE active = 1"
             ).fetchall()
             result: list[dict] = []
             for event in definitions:
                 dates = due_dates(
                     date.fromisoformat(event["first_due_date"]),
-                    event["interval_months"],
+                    0 if event["frequency"] == "once" else event["interval_months"],
                     monday,
                     sunday,
                 )
@@ -106,6 +107,18 @@ class Database:
     def set_paid(self, event_id: int, due_date: date, paid: bool) -> None:
         """Set paid state for one occurrence only."""
         with self.session() as conn:
+            definition = conn.execute(
+                "SELECT first_due_date, frequency, interval_months "
+                "FROM recurring_events WHERE id = ? AND active = 1",
+                (event_id,),
+            ).fetchone()
+            if definition is None:
+                raise ValueError("Event does not exist or is inactive")
+            interval = 0 if definition["frequency"] == "once" else definition["interval_months"]
+            if not due_dates(
+                date.fromisoformat(definition["first_due_date"]), interval, due_date, due_date
+            ):
+                raise ValueError("Date is not an occurrence of this event")
             conn.execute(
                 "INSERT OR IGNORE INTO occurrences (event_id, due_date) VALUES (?, ?)",
                 (event_id, due_date.isoformat()),
