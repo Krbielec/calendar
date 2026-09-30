@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Household Calendar preview</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --primary-color: #1976d2;
+        --primary-text-color: #202124;
+        --secondary-text-color: #62676d;
+        --secondary-background-color: #f1f3f4;
+        --card-background-color: #fff;
+        --divider-color: #d7dce0;
+        --success-color: #2e7d32;
+        font: 16px/1.4 system-ui, sans-serif;
+        background: #eef1f5;
+      }
+      body { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+      h1 { font-size: 1.2rem; }
+      p { color: #555; }
+      ha-card { display: block; border: 1px solid var(--divider-color); border-radius: 12px; background: var(--card-background-color); box-shadow: 0 2px 8px #0001; }
+      @media (prefers-color-scheme: dark) {
+        :root { --primary-text-color: #e8eaed; --secondary-text-color: #bdc1c6; --secondary-background-color: #30343a; --card-background-color: #202124; --divider-color: #45494f; background: #151619; }
+        body { color: #e8eaed; }
+        p { color: #bdc1c6; }
+      }
+    </style>
+    <script type="module" src="./preview.js"></script>
+  </head>
+  <body>
+    <h1>Household Calendar · local preview</h1>
+    <p>Mock data only. Navigate weeks and toggle paid status; changes live in this browser tab.</p>
+    <household-calendar-card></household-calendar-card>
+  </body>
+</html>

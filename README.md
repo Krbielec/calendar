@@ -20,6 +20,10 @@ type: custom:household-calendar-card
 
 The add-on publishes the displayed week as `sensor.household_calendar_week`. The card asks the add-on for other weeks and sends paid-state changes over Home Assistant's authenticated WebSocket event bus. The add-on writes each paid-state change to the local SQLite database and republishes that week.
 
+## Test without Home Assistant
+
+Run the database and recurrence tests with `python -m unittest discover -v`. To preview the card with browser-only mock events, run `python -m http.server 8000` from this directory and open `http://localhost:8000/dev/preview.html`. The preview exercises week navigation and paid toggles; those mock changes are not written to SQLite.
+
 ## Add-on development
 
 The add-on manifest is `config.yaml`. Home Assistant provides its Supervisor token, options file, and persistent `/data` directory. Run locally with Home Assistant's add-on build tooling; the container is not intended to run without Supervisor credentials.
