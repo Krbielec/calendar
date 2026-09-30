@@ -1,8 +1,10 @@
 """Local SQLite storage for recurring bill definitions and their occurrences."""
 
 import sqlite3
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
+from typing import Iterator
 
 from .recurrence import due_dates
 
@@ -17,9 +19,19 @@ class Database:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    @contextmanager
+    def session(self) -> Iterator[sqlite3.Connection]:
+        """Commit or roll back a connection and always release its file handle."""
+        conn = self.connect()
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.connect() as conn:
+        with self.session() as conn:
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS recurring_events (
@@ -51,7 +63,7 @@ class Database:
         if interval_months not in (0, 1, 2, 3, 12):
             raise ValueError("Recurrence must be once, monthly, every 2 months, quarterly, or yearly")
         frequency = "once" if interval_months == 0 else ("yearly" if interval_months == 12 else "monthly")
-        with self.connect() as conn:
+        with self.session() as conn:
             cur = conn.execute(
                 "INSERT INTO recurring_events (title, first_due_date, frequency, interval_months) "
                 "VALUES (?, ?, ?, ?)",
@@ -62,7 +74,7 @@ class Database:
     def events_for_week(self, monday: date) -> list[dict]:
         """Return that week's events, creating unpaid occurrence rows as needed."""
         sunday = date.fromordinal(monday.toordinal() + 6)
-        with self.connect() as conn:
+        with self.session() as conn:
             definitions = conn.execute(
                 "SELECT id, title, first_due_date, interval_months FROM recurring_events WHERE active = 1"
             ).fetchall()
@@ -93,7 +105,7 @@ class Database:
 
     def set_paid(self, event_id: int, due_date: date, paid: bool) -> None:
         """Set paid state for one occurrence only."""
-        with self.connect() as conn:
+        with self.session() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO occurrences (event_id, due_date) VALUES (?, ?)",
                 (event_id, due_date.isoformat()),
