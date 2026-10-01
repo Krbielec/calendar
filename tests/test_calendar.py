@@ -14,6 +14,9 @@ class CalendarDatabaseTests(unittest.TestCase):
         self.db = Database(Path(self.temp_dir.name) / "calendar.sqlite3")
         self.db.initialize()
 
+    def test_database_starts_without_sample_events(self) -> None:
+        self.assertEqual(self.db.list_events(), [])
+
     def test_retrieves_sample_events_for_week(self) -> None:
         # These sample bills are due Friday, 28 February 2025.
         monthly_id = self.db.create_event("Netflix", date(2025, 1, 31), 1)
@@ -64,19 +67,44 @@ class CalendarDatabaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.db.set_paid(netflix_id, date(2025, 3, 30), True)
 
-    def test_initial_sample_event_is_added_only_to_an_empty_database(self) -> None:
-        due_date = date(2025, 2, 28)
-        netflix_id = self.db.ensure_initial_event("Netflix", due_date)
+    def test_edit_changes_schedule_and_keeps_paid_occurrence_history(self) -> None:
+        event_id = self.db.create_event("Netflix", date(2025, 1, 31), 1)
+        self.db.set_paid(event_id, date(2025, 2, 28), True)
 
-        self.assertIsNotNone(netflix_id)
-        self.assertIsNone(self.db.ensure_initial_event("Netflix", due_date))
-        events = self.db.events_for_week(date(2025, 2, 24))
-        self.assertEqual(events, [{
-            "id": netflix_id,
-            "title": "Netflix",
-            "date": "2025-02-28",
-            "paid": False,
-        }])
+        self.db.update_event(event_id, "Streaming", date(2025, 3, 31), 2)
+
+        self.assertEqual(
+            self.db.events_for_week(date(2025, 3, 31)),
+            [{"id": event_id, "title": "Streaming", "date": "2025-03-31", "paid": False}],
+        )
+        event = self.db.list_events()[0]
+        self.assertEqual(event["paid_occurrences"], 1)
+        self.assertEqual(event["first_due_date"], "2025-03-31")
+        self.assertEqual(event["interval_months"], 2)
+
+    def test_archiving_hides_future_events_and_restoring_keeps_history(self) -> None:
+        event_id = self.db.create_event("Electricity", date(2025, 2, 28), 1)
+        self.db.set_paid(event_id, date(2025, 2, 28), True)
+
+        self.db.set_event_active(event_id, False)
+        self.assertEqual(self.db.events_for_week(date(2025, 2, 24)), [])
+        self.db.set_event_active(event_id, True)
+
+        self.assertEqual(self.db.events_for_week(date(2025, 2, 24))[0]["paid"], True)
+        self.assertEqual(self.db.list_events()[0]["paid_occurrences"], 1)
+
+    def test_update_rejects_invalid_event_data(self) -> None:
+        event_id = self.db.create_event("Netflix", date(2025, 1, 31), 1)
+
+        with self.assertRaises(ValueError):
+            self.db.update_event(event_id, "  ", date(2025, 2, 1), 1)
+        with self.assertRaises(ValueError):
+            self.db.update_event(event_id, "Netflix", date(2025, 2, 1), 4)
+
+    def test_admin_list_reports_one_time_events_without_recurrence(self) -> None:
+        self.db.create_event("Appointment", date(2025, 2, 1), 0)
+
+        self.assertEqual(self.db.list_events()[0]["interval_months"], 0)
 
 
 class RecurrenceTests(unittest.TestCase):

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Household Calendar</title>
+  <style>
+    :root { color-scheme: light dark; font: 15px system-ui, sans-serif; }
+    body { max-width: 980px; margin: 0 auto; padding: 24px; background: var(--primary-background-color, #111827); color: var(--primary-text-color, #f3f4f6); }
+    h1 { margin: 0 0 6px; font-size: 1.7rem; }
+    p { color: var(--secondary-text-color, #aab2c0); }
+    button, input, select { font: inherit; border: 1px solid #687080; border-radius: 7px; padding: 9px 12px; }
+    button { cursor: pointer; background: #263449; color: inherit; }
+    button.primary { background: #2673c7; border-color: #2673c7; }
+    button.danger { color: #ffb4ab; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .table-wrap { overflow-x: auto; border: 1px solid #424a58; border-radius: 9px; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #424a58; }
+    th { color: #b9c4d5; font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    .status { color: #8bd5a5; } .status.archived { color: #aab2c0; }
+    .actions { display: flex; gap: 8px; }
+    dialog { width: min(420px, calc(100vw - 48px)); border: 1px solid #687080; border-radius: 12px; background: #202938; color: #f3f4f6; }
+    dialog::backdrop { background: #0009; }
+    form { display: grid; gap: 14px; }
+    label { display: grid; gap: 5px; }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    #message { min-height: 1.5em; }
+    @media (prefers-color-scheme: light) { body { background: #f7f8fa; color: #20242b; } button { background: #edf1f6; } dialog { background: #fff; color: #20242b; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Household Calendar</h1><p>Manage recurring event definitions. Paid occurrences remain in history when a series is edited or archived.</p></div>
+    <button class="primary" id="add">Add event</button>
+  </header>
+  <div id="message" role="status" aria-live="polite"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Event</th><th>First due</th><th>Repeats</th><th>Status</th><th>Paid records</th><th></th></tr></thead>
+      <tbody id="events"><tr><td colspan="6">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <dialog id="editor">
+    <form id="event-form">
+      <h2 id="form-title">Add event</h2>
+      <input type="hidden" name="id">
+      <label>Event name<input name="title" maxlength="120" required autocomplete="off"></label>
+      <label>First due date<input name="first_due_date" type="date" required></label>
+      <label>Repeat<select name="interval_months">
+        <option value="0">Does not repeat</option><option value="1">Monthly</option>
+        <option value="2">Every 2 months</option><option value="3">Quarterly</option><option value="12">Annually</option>
+      </select></label>
+      <div class="form-actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+    </form>
+  </dialog>
+  <script>
+    const api = new URL('api/events', document.baseURI);
+    const tbody = document.querySelector('#events');
+    const dialog = document.querySelector('#editor');
+    const form = document.querySelector('#event-form');
+    const message = document.querySelector('#message');
+    const labels = {0: 'Does not repeat', 1: 'Monthly', 2: 'Every 2 months', 3: 'Quarterly', 12: 'Annually'};
+    const endpoint = (suffix = '') => new URL(suffix, api.href.endsWith('/') ? api.href : api.href + '/');
+    const cell = (row, value, className) => { const td = row.insertCell(); td.textContent = value; if (className) td.className = className; return td; };
+
+    async function request(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) throw new Error(await response.text() || `Request failed (${response.status})`);
+      return response.status === 204 ? null : response.json();
+    }
+    async function load() {
+      try {
+        const events = await request(api);
+        tbody.replaceChildren();
+        if (!events.length) { const row = tbody.insertRow(); const td = row.insertCell(); td.colSpan = 6; td.textContent = 'No events yet. Add your first event.'; }
+        for (const event of events) {
+          const row = tbody.insertRow();
+          cell(row, event.title);
+          cell(row, event.first_due_date);
+          cell(row, labels[event.interval_months] || 'Unknown');
+          cell(row, event.active ? 'Active' : 'Archived', event.active ? 'status' : 'status archived');
+          cell(row, String(event.paid_occurrences));
+          const actions = cell(row, ''); actions.className = 'actions';
+          const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.addEventListener('click', () => openEditor(event)); actions.append(edit);
+          const toggle = document.createElement('button'); toggle.textContent = event.active ? 'Archive' : 'Restore';
+          toggle.className = event.active ? 'danger' : '';
+          toggle.addEventListener('click', () => setActive(event, !event.active)); actions.append(toggle);
+        }
+        message.textContent = '';
+      } catch (error) { message.textContent = `Could not load events: ${error.message}`; }
+    }
+    function openEditor(event) {
+      form.reset();
+      form.elements.id.value = event?.id ?? '';
+      form.elements.title.value = event?.title ?? '';
+      form.elements.first_due_date.value = event?.first_due_date ?? new Date().toISOString().slice(0, 10);
+      form.elements.interval_months.value = String(event?.interval_months ?? 0);
+      document.querySelector('#form-title').textContent = event ? 'Edit event' : 'Add event';
+      dialog.showModal();
+    }
+    async function setActive(event, active) {
+      if (active === false && !confirm(`Archive “${event.title}”? Its history will be kept.`)) return;
+      try {
+        await request(endpoint(`${event.id}/active`), {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({active})});
+        await load();
+      } catch (error) { message.textContent = `Could not update event: ${error.message}`; }
+    }
+    document.querySelector('#add').addEventListener('click', () => openEditor());
+    document.querySelector('#cancel').addEventListener('click', () => dialog.close());
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const id = form.elements.id.value;
+      const payload = {title: form.elements.title.value, first_due_date: form.elements.first_due_date.value, interval_months: Number(form.elements.interval_months.value)};
+      try {
+        await request(id ? endpoint(id) : api, {method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+        dialog.close(); await load();
+      } catch (error) { message.textContent = `Could not save event: ${error.message}`; }
+    });
+    load();
+  </script>
+</body>
+</html>

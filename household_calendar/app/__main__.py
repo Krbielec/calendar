@@ -5,10 +5,11 @@ import json
 import logging
 import os
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .admin import run_admin_server
 from .database import Database
 from .home_assistant import HomeAssistantBridge
 
@@ -17,7 +18,7 @@ OPTIONS_PATH = Path("/data/options.json")
 DATABASE_PATH = Path("/data/calendar.sqlite3")
 CARD_SOURCE = Path("/app/www/household-calendar-card.js")
 CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
-ADDON_VERSION = "0.1.0"
+ADDON_VERSION = "0.2.0"
 
 
 async def run() -> None:
@@ -34,11 +35,6 @@ async def run() -> None:
     db = Database(DATABASE_PATH)
     db.initialize()
     LOG.info("Database ready; configured timezone: %s", options["timezone"])
-    tomorrow = datetime.now(ZoneInfo(options["timezone"])).date() + timedelta(days=1)
-    seeded_id = db.ensure_initial_event("Netflix", tomorrow)
-    if seeded_id is not None:
-        LOG.info("Seeded unpaid one-time Netflix event for %s", tomorrow)
-
     CARD_DESTINATION.parent.mkdir(parents=True, exist_ok=True)
     CARD_DESTINATION.write_bytes(CARD_SOURCE.read_bytes())
 
@@ -49,7 +45,7 @@ async def run() -> None:
 
     bridge = HomeAssistantBridge(db, options["timezone"], ADDON_VERSION)
     await bridge.publish_week(datetime.now(ZoneInfo(options["timezone"])).date())
-    await bridge.run(stopped)
+    await asyncio.gather(bridge.run(stopped), run_admin_server(db, bridge, stopped))
 
 
 if __name__ == "__main__":

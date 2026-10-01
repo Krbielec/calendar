@@ -58,10 +58,7 @@ class Database:
             )
 
     def create_event(self, title: str, first_due_date: date, interval_months: int) -> int:
-        if not title.strip():
-            raise ValueError("Event title cannot be empty")
-        if interval_months not in (0, 1, 2, 3, 12):
-            raise ValueError("Recurrence must be once, monthly, every 2 months, quarterly, or yearly")
+        title = self._validate_event(title, interval_months)
         frequency = "once" if interval_months == 0 else ("yearly" if interval_months == 12 else "monthly")
         with self.session() as conn:
             cur = conn.execute(
@@ -71,20 +68,49 @@ class Database:
             )
             return int(cur.lastrowid)
 
-    def ensure_initial_event(self, title: str, due_date: date) -> int | None:
-        """Seed a one-time event only when there are no event definitions yet."""
-        if not title.strip():
+    @staticmethod
+    def _validate_event(title: str, interval_months: int) -> str:
+        if not isinstance(title, str) or not title.strip():
             raise ValueError("Event title cannot be empty")
+        if isinstance(interval_months, bool) or interval_months not in (0, 1, 2, 3, 12):
+            raise ValueError("Recurrence must be once, monthly, every 2 months, quarterly, or yearly")
+        return title.strip()
+
+    def list_events(self) -> list[dict]:
+        """Return event definitions and paid-occurrence counts for the admin page."""
         with self.session() as conn:
-            existing = conn.execute("SELECT 1 FROM recurring_events LIMIT 1").fetchone()
-            if existing:
-                return None
-            cur = conn.execute(
-                "INSERT INTO recurring_events (title, first_due_date, frequency, interval_months) "
-                "VALUES (?, ?, 'once', 1)",
-                (title.strip(), due_date.isoformat()),
+            rows = conn.execute(
+                "SELECT e.id, e.title, e.first_due_date, "
+                "CASE WHEN e.frequency = 'once' THEN 0 ELSE e.interval_months END AS interval_months, e.active, "
+                "COUNT(o.id) AS paid_occurrences "
+                "FROM recurring_events e LEFT JOIN occurrences o "
+                "ON o.event_id = e.id AND o.paid_at IS NOT NULL "
+                "GROUP BY e.id ORDER BY e.active DESC, e.first_due_date, e.title COLLATE NOCASE"
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def update_event(self, event_id: int, title: str, first_due_date: date, interval_months: int) -> None:
+        """Edit a series definition without deleting its paid occurrence history."""
+        title = self._validate_event(title, interval_months)
+        frequency = "once" if interval_months == 0 else ("yearly" if interval_months == 12 else "monthly")
+        with self.session() as conn:
+            result = conn.execute(
+                "UPDATE recurring_events SET title = ?, first_due_date = ?, frequency = ?, interval_months = ? "
+                "WHERE id = ?",
+                (title, first_due_date.isoformat(), frequency, max(interval_months, 1), event_id),
             )
-            return int(cur.lastrowid)
+            if result.rowcount == 0:
+                raise ValueError("Event does not exist")
+
+    def set_event_active(self, event_id: int, active: bool) -> None:
+        """Archive or restore a series while retaining all occurrence history."""
+        with self.session() as conn:
+            result = conn.execute(
+                "UPDATE recurring_events SET active = ? WHERE id = ?",
+                (int(active), event_id),
+            )
+            if result.rowcount == 0:
+                raise ValueError("Event does not exist")
 
     def events_for_week(self, monday: date) -> list[dict]:
         """Return that week's events, creating unpaid occurrence rows as needed."""

@@ -8,8 +8,7 @@ A Home Assistant add-on for a weekly, day-grouped calendar of household events s
 - Events are stored locally in SQLite under `/data`, so they survive add-on restarts.
 - Recurrences are anchored to the first due date. Supported intervals are one month, two months, three months, and twelve months. If an anchor day does not exist in a month, that occurrence uses the month's final day; later occurrences return to the anchor day.
 - Paid state belongs to an individual occurrence. Marking one occurrence paid leaves later occurrences unpaid.
-- Event entry and editing are a later step. The initial database separates recurring event definitions from dated occurrences so that entry methods can be added without changing the calendar model.
-- On first startup only, an empty event database is seeded with one unpaid, one-time Netflix event due tomorrow in the configured timezone. Existing databases with events are left alone.
+- Recurring event definitions are managed in the add-on's Ingress panel; paid state belongs to individual dated occurrences.
 
 ## Lovelace card
 
@@ -20,6 +19,10 @@ type: custom:household-calendar-card
 ```
 
 The add-on publishes the displayed week as `sensor.household_calendar_week`. The card asks the add-on for other weeks and sends paid-state changes over Home Assistant's authenticated WebSocket event bus. The add-on writes each paid-state change to the local SQLite database and republishes that week.
+
+## Manage events
+
+Open the add-on's **Household Calendar** sidebar panel (or its **Open Web UI** button) to create, edit, archive, and restore event definitions. Recurrence supports one-time, monthly, every two months, quarterly, and annual schedules. Editing a definition changes the generated schedule while retaining paid occurrence records; archiving pauses future display without deleting history.
 
 ## Test without Home Assistant
 
