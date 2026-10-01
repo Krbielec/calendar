@@ -9,6 +9,7 @@ A Home Assistant add-on for a weekly, day-grouped calendar of household events s
 - Recurrences are anchored to the first due date. Supported intervals are one month, two months, three months, and twelve months. If an anchor day does not exist in a month, that occurrence uses the month's final day; later occurrences return to the anchor day.
 - Paid state belongs to an individual occurrence. Marking one occurrence paid leaves later occurrences unpaid.
 - Event entry and editing are a later step. The initial database separates recurring event definitions from dated occurrences so that entry methods can be added without changing the calendar model.
+- On first startup only, an empty event database is seeded with one unpaid, one-time Netflix event due tomorrow in the configured timezone. Existing databases with events are left alone.
 
 ## Lovelace card
 
@@ -26,4 +27,4 @@ Run the database and recurrence tests with `python -m unittest discover -v`. To 
 
 ## Add-on development
 
-The add-on manifest is `config.yaml`. Home Assistant provides its Supervisor token, options file, and persistent `/data` directory. Run locally with Home Assistant's add-on build tooling; the container is not intended to run without Supervisor credentials.
+The app repository manifest is `repository.yaml`; the add-on itself is in `household_calendar/`. Home Assistant provides its Supervisor token, options file, and persistent `/data` directory. Run locally with Home Assistant's app build tooling; the container is not intended to run without Supervisor credentials.

@@ -1,29 +1,24 @@
-import "../www/household-calendar-card.js";
+import "../household_calendar/www/household-calendar-card.js";
 
 const today = new Date();
 today.setHours(12, 0, 0, 0);
 today.setDate(today.getDate() - ((today.getDay() + 6) % 7));
 const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const paidOccurrences = new Set();
+const netflixDue = new Date();
+netflixDue.setHours(12, 0, 0, 0);
+netflixDue.setDate(netflixDue.getDate() + 1);
+const netflixDueDate = formatDate(netflixDue);
 const eventsForWeek = (monday) => {
-  const examples = [
-    { day: 0, id: 1, title: "Netflix" },
-    { day: 1, id: 2, title: "Spotify" },
-    { day: 2, id: 3, title: "Electricity bill" },
-    { day: 4, id: 4, title: "Internet bill" },
-    { day: 6, id: 5, title: "Weekly groceries" },
-  ];
-  return examples.map((example) => {
-    const due = new Date(`${monday}T12:00:00`);
-    due.setDate(due.getDate() + example.day);
-    const date = formatDate(due);
-    return {
-      id: example.id,
-      title: example.title,
-      date,
-      paid: paidOccurrences.has(`${example.id}:${date}`),
-    };
-  });
+  const nextMonday = new Date(`${monday}T12:00:00`);
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  if (netflixDueDate < monday || netflixDueDate >= formatDate(nextMonday)) return [];
+  return [{
+    id: 1,
+    title: "Netflix",
+    date: netflixDueDate,
+    paid: paidOccurrences.has(`1:${netflixDueDate}`),
+  }];
 };
 
 const mondayOf = (isoDate) => {

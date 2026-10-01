@@ -71,6 +71,21 @@ class Database:
             )
             return int(cur.lastrowid)
 
+    def ensure_initial_event(self, title: str, due_date: date) -> int | None:
+        """Seed a one-time event only when there are no event definitions yet."""
+        if not title.strip():
+            raise ValueError("Event title cannot be empty")
+        with self.session() as conn:
+            existing = conn.execute("SELECT 1 FROM recurring_events LIMIT 1").fetchone()
+            if existing:
+                return None
+            cur = conn.execute(
+                "INSERT INTO recurring_events (title, first_due_date, frequency, interval_months) "
+                "VALUES (?, ?, 'once', 1)",
+                (title.strip(), due_date.isoformat()),
+            )
+            return int(cur.lastrowid)
+
     def events_for_week(self, monday: date) -> list[dict]:
         """Return that week's events, creating unpaid occurrence rows as needed."""
         sunday = date.fromordinal(monday.toordinal() + 6)

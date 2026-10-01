@@ -3,8 +3,8 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from app.database import Database
-from app.recurrence import due_dates
+from household_calendar.app.database import Database
+from household_calendar.app.recurrence import due_dates
 
 
 class CalendarDatabaseTests(unittest.TestCase):
@@ -63,6 +63,20 @@ class CalendarDatabaseTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.db.set_paid(netflix_id, date(2025, 3, 30), True)
+
+    def test_initial_sample_event_is_added_only_to_an_empty_database(self) -> None:
+        due_date = date(2025, 2, 28)
+        netflix_id = self.db.ensure_initial_event("Netflix", due_date)
+
+        self.assertIsNotNone(netflix_id)
+        self.assertIsNone(self.db.ensure_initial_event("Netflix", due_date))
+        events = self.db.events_for_week(date(2025, 2, 24))
+        self.assertEqual(events, [{
+            "id": netflix_id,
+            "title": "Netflix",
+            "date": "2025-02-28",
+            "paid": False,
+        }])
 
 
 class RecurrenceTests(unittest.TestCase):

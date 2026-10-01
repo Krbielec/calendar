@@ -5,8 +5,8 @@ import json
 import logging
 import os
 import signal
+from datetime import datetime, timedelta
 from pathlib import Path
-from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from .database import Database
@@ -34,6 +34,10 @@ async def run() -> None:
     db = Database(DATABASE_PATH)
     db.initialize()
     LOG.info("Database ready; configured timezone: %s", options["timezone"])
+    tomorrow = datetime.now(ZoneInfo(options["timezone"])).date() + timedelta(days=1)
+    seeded_id = db.ensure_initial_event("Netflix", tomorrow)
+    if seeded_id is not None:
+        LOG.info("Seeded unpaid one-time Netflix event for %s", tomorrow)
 
     CARD_DESTINATION.parent.mkdir(parents=True, exist_ok=True)
     CARD_DESTINATION.write_bytes(CARD_SOURCE.read_bytes())
