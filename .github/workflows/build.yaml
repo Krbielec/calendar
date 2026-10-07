@@ -39,10 +39,10 @@ jobs:
           context: ./household_calendar
           image: ${{ matrix.image }}
           image-tags: |
-            0.2.0
+            0.3.0
             latest
           push: "true"
-          version: "0.2.0"
+          version: "0.3.0"
 
   publish-manifest:
     name: Publish multi-architecture image
@@ -59,6 +59,6 @@ jobs:
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
           image-name: household-calendar
           image-tags: |
-            0.2.0
+            0.3.0
             latest
           registry-prefix: ghcr.io/krbielec

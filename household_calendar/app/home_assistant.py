@@ -17,6 +17,7 @@ from .database import Database
 LOG = logging.getLogger("household_calendar.ha")
 ENTITY_ID = "sensor.household_calendar_week"
 WEEK_REQUEST_EVENT = "household_calendar_week_requested"
+WEEK_RESPONSE_EVENT = "household_calendar_week_response"
 PAID_EVENT = "household_calendar_paid"
 
 
@@ -124,10 +125,12 @@ class HomeAssistantBridge:
                 requested = date.fromisoformat(str(data["monday"]))
                 if requested.weekday() != 0:
                     raise ValueError("requested date is not a Monday")
+                request_id = self._request_id(data)
             except (KeyError, TypeError, ValueError) as exc:
                 LOG.warning("Ignoring invalid week request: %s", exc)
                 return
             await self.publish_week(requested)
+            await self._respond_with_week(requested, request_id)
         elif event_type == PAID_EVENT:
             try:
                 if isinstance(data["event_id"], bool):
@@ -137,9 +140,35 @@ class HomeAssistantBridge:
                 paid = data["paid"]
                 if not isinstance(paid, bool):
                     raise ValueError("paid must be a boolean")
+                request_id = self._request_id(data)
+                requested = date.fromisoformat(str(data["monday"]))
+                if requested.weekday() != 0:
+                    raise ValueError("requested date is not a Monday")
                 self.db.set_paid(event_id, due_date, paid)
             except (KeyError, TypeError, ValueError) as exc:
                 LOG.warning("Ignoring invalid paid-state request: %s", exc)
                 return
-            if self.active_monday is not None:
-                await self.publish_week(self.active_monday)
+            await self.publish_week(requested)
+            await self._respond_with_week(requested, request_id)
+
+    @staticmethod
+    def _request_id(data: dict[str, Any]) -> str:
+        request_id = data["request_id"]
+        if not isinstance(request_id, str) or not request_id or len(request_id) > 100:
+            raise ValueError("request_id must be a non-empty string of at most 100 characters")
+        return request_id
+
+    async def _respond_with_week(self, monday: date, request_id: str) -> None:
+        events = self.db.events_for_week(monday)
+        payload = {
+            "request_id": request_id,
+            "monday": monday.isoformat(),
+            "events": events,
+        }
+        async with httpx.AsyncClient(headers=self.headers, timeout=15) as client:
+            response = await client.post(
+                f"{self.api_url}/events/{WEEK_RESPONSE_EVENT}",
+                json=payload,
+            )
+            response.raise_for_status()
+        LOG.info("Sent week response for %s (request %s)", monday, request_id)

@@ -18,7 +18,7 @@ The add-on copies and registers its card automatically. Add a manual card to a d
 type: custom:household-calendar-card
 ```
 
-The add-on publishes the displayed week as `sensor.household_calendar_week`. The card asks the add-on for other weeks and sends paid-state changes over Home Assistant's authenticated WebSocket event bus. The add-on writes each paid-state change to the local SQLite database and republishes that week.
+The add-on publishes the current week as `sensor.household_calendar_week`. The card requests other weeks over Home Assistant's authenticated WebSocket event bus and receives a correlated response, so each dashboard can display a different week independently. Paid-state changes use the same request/reply path and are written to the local SQLite database.
 
 ## Manage events
 

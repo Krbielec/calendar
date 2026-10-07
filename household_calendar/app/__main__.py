@@ -18,7 +18,7 @@ OPTIONS_PATH = Path("/data/options.json")
 DATABASE_PATH = Path("/data/calendar.sqlite3")
 CARD_SOURCE = Path("/app/www/household-calendar-card.js")
 CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
-ADDON_VERSION = "0.2.0"
+ADDON_VERSION = "0.3.0"
 
 
 async def run() -> None:

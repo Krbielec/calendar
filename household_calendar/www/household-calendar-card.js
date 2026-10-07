@@ -3,6 +3,9 @@ class HouseholdCalendarCard extends HTMLElement {
     super();
     this._weekStart = null;
     this._lastRequested = null;
+    this._requestId = null;
+    this._weekAttributes = null;
+    this._responseSubscription = null;
     this._pending = new Set();
     this._overrides = new Map();
   }
@@ -17,9 +20,12 @@ class HouseholdCalendarCard extends HTMLElement {
 
     if (!this._weekStart) this._weekStart = this._monday(this._today(hass));
     const attributes = hass.states["sensor.household_calendar_week"]?.attributes || {};
-    if (attributes.monday === this._weekStart) {
-      this._lastRequested = null;
-      for (const event of attributes.events || []) {
+    if (attributes.monday === this._weekStart && !this._weekAttributes) {
+      this._weekAttributes = attributes;
+    }
+    this._ensureResponseSubscription();
+    if (this._weekAttributes?.monday === this._weekStart) {
+      for (const event of this._weekAttributes.events || []) {
         const key = this._eventKey(event);
         if (this._overrides.get(key) === event.paid) {
           this._overrides.delete(key);
@@ -29,7 +35,32 @@ class HouseholdCalendarCard extends HTMLElement {
     } else if (this._lastRequested !== this._weekStart) {
       this._requestWeek(this._weekStart);
     }
-    this._render(attributes.monday === this._weekStart ? attributes : null);
+    this._render(this._weekAttributes?.monday === this._weekStart ? this._weekAttributes : null);
+  }
+
+  _ensureResponseSubscription() {
+    if (this._responseSubscription || !this._hass?.connection?.subscribeEvents) return;
+    this._responseSubscription = this._hass.connection.subscribeEvents(
+      (event) => this._handleWeekResponse(event),
+      "household_calendar_week_response",
+    ).catch((error) => {
+      this._responseSubscription = null;
+      console.error("Household Calendar response subscription failed", error);
+    });
+  }
+
+  _handleWeekResponse(event) {
+    const data = event?.data || {};
+    if (data.request_id !== this._requestId || data.monday !== this._weekStart) return;
+    this._weekAttributes = { monday: data.monday, events: data.events || [] };
+    for (const item of this._weekAttributes.events) {
+      const key = this._eventKey(item);
+      if (this._overrides.get(key) === item.paid) {
+        this._overrides.delete(key);
+        this._pending.delete(key);
+      }
+    }
+    this._render(this._weekAttributes);
   }
 
   _build() {
@@ -101,12 +132,15 @@ class HouseholdCalendarCard extends HTMLElement {
   }
 
   _requestWeek(monday) {
+    this._weekAttributes = null;
     this._lastRequested = monday;
-    this._hass.callWS({
+    this._requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const requestId = this._requestId;
+    Promise.resolve(this._responseSubscription).then(() => this._hass.callWS({
       type: "fire_event",
       event_type: "household_calendar_week_requested",
-      event_data: { monday },
-    }).catch((error) => console.error("Household Calendar week request failed", error));
+      event_data: { monday, request_id: requestId },
+    })).catch((error) => console.error("Household Calendar week request failed", error));
   }
 
   _eventKey(event) {
@@ -126,7 +160,7 @@ class HouseholdCalendarCard extends HTMLElement {
 
     const eventId = Number(button.dataset.eventId);
     const dueDate = button.dataset.eventDate;
-    const attrs = this._hass.states["sensor.household_calendar_week"]?.attributes || {};
+    const attrs = this._weekAttributes || {};
     const event = (attrs.events || []).find((item) => item.id === eventId && item.date === dueDate);
     if (!event || !Number.isSafeInteger(eventId)) return;
     const key = this._eventKey(event);
@@ -138,18 +172,21 @@ class HouseholdCalendarCard extends HTMLElement {
     const retryTimer = window.setTimeout(() => {
       if (!this._pending.delete(key)) return;
       this._overrides.delete(key);
-      this._render(this._hass.states["sensor.household_calendar_week"]?.attributes || null);
+      this._render(this._weekAttributes);
     }, 10000);
     this._hass.callWS({
       type: "fire_event",
       event_type: "household_calendar_paid",
-      event_data: { event_id: eventId, due_date: dueDate, paid },
+      event_data: {
+        event_id: eventId, due_date: dueDate, paid,
+        monday: this._weekStart, request_id: this._requestId,
+      },
     }).catch((error) => {
       console.error("Household Calendar paid-state update failed", error);
       window.clearTimeout(retryTimer);
       this._pending.delete(key);
       this._overrides.delete(key);
-      this._render(attrs);
+      this._render(this._weekAttributes);
     });
   }
 
