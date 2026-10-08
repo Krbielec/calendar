@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from .admin import run_admin_server
 from .database import Database
 from .home_assistant import HomeAssistantBridge
@@ -18,7 +20,7 @@ OPTIONS_PATH = Path("/data/options.json")
 DATABASE_PATH = Path("/data/calendar.sqlite3")
 CARD_SOURCE = Path("/app/www/household-calendar-card.js")
 CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
-ADDON_VERSION = "0.3.0"
+ADDON_VERSION = "0.3.1"
 
 
 async def run() -> None:
@@ -44,8 +46,25 @@ async def run() -> None:
         loop.add_signal_handler(sig, stopped.set)
 
     bridge = HomeAssistantBridge(db, options["timezone"], ADDON_VERSION)
-    await bridge.publish_week(datetime.now(ZoneInfo(options["timezone"])).date())
-    await asyncio.gather(bridge.run(stopped), run_admin_server(db, bridge, stopped))
+
+    async def publish_initial_week() -> None:
+        delay = 5
+        while not stopped.is_set():
+            try:
+                await bridge.publish_week(datetime.now(ZoneInfo(options["timezone"])).date())
+                return
+            except httpx.HTTPError as exc:
+                LOG.warning("Home Assistant API is not ready: %s; retrying in %d seconds", exc, delay)
+                try:
+                    await asyncio.wait_for(stopped.wait(), timeout=delay)
+                except asyncio.TimeoutError:
+                    delay = min(delay * 2, 60)
+
+    await asyncio.gather(
+        publish_initial_week(),
+        bridge.run(stopped),
+        run_admin_server(db, bridge, stopped),
+    )
 
 
 if __name__ == "__main__":

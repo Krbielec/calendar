@@ -1,7 +1,7 @@
 name: "Household Calendar"
 slug: "household_calendar"
 description: "A local, bill-focused weekly calendar for Home Assistant"
-version: "0.3.0"
+version: "0.3.1"
 image: "ghcr.io/krbielec/household-calendar"
 startup: application
 boot: auto

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import websockets
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import WebSocketException
 
 from .database import Database
 
@@ -111,7 +111,7 @@ class HomeAssistantBridge:
                             continue
                         event = message.get("event", {})
                         await self._handle_event(event.get("event_type", ""), event.get("data", {}))
-            except (OSError, ConnectionClosed, RuntimeError, ValueError, httpx.HTTPError) as exc:
+            except (OSError, WebSocketException, RuntimeError, ValueError, httpx.HTTPError) as exc:
                 if not stopped.is_set():
                     LOG.warning("Home Assistant connection failed: %s; retrying in 10 seconds", exc)
                     try:
