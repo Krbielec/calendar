@@ -1,0 +1,37 @@
+get_week:
+  name: Get week
+  description: Request a week's events from the Household Calendar add-on.
+  fields:
+    monday:
+      name: Monday
+      description: Monday date for the week to retrieve.
+      required: true
+      selector:
+        date: {}
+set_paid:
+  name: Set paid state
+  description: Mark a dated event occurrence paid or unpaid.
+  fields:
+    event_id:
+      name: Event ID
+      required: true
+      selector:
+        number:
+          min: 1
+          step: 1
+          mode: box
+    due_date:
+      name: Due date
+      required: true
+      selector:
+        date: {}
+    paid:
+      name: Paid
+      required: true
+      selector:
+        boolean: {}
+    monday:
+      name: Week Monday
+      required: true
+      selector:
+        date: {}

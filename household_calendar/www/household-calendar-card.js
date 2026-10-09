@@ -3,9 +3,8 @@ class HouseholdCalendarCard extends HTMLElement {
     super();
     this._weekStart = null;
     this._lastRequested = null;
-    this._requestId = null;
     this._weekAttributes = null;
-    this._responseSubscription = null;
+    this._requestError = null;
     this._pending = new Set();
     this._overrides = new Map();
   }
@@ -23,7 +22,6 @@ class HouseholdCalendarCard extends HTMLElement {
     if (attributes.monday === this._weekStart && !this._weekAttributes) {
       this._weekAttributes = attributes;
     }
-    this._ensureResponseSubscription();
     if (this._weekAttributes?.monday === this._weekStart) {
       for (const event of this._weekAttributes.events || []) {
         const key = this._eventKey(event);
@@ -38,21 +36,11 @@ class HouseholdCalendarCard extends HTMLElement {
     this._render(this._weekAttributes?.monday === this._weekStart ? this._weekAttributes : null);
   }
 
-  _ensureResponseSubscription() {
-    if (this._responseSubscription || !this._hass?.connection?.subscribeEvents) return;
-    this._responseSubscription = this._hass.connection.subscribeEvents(
-      (event) => this._handleWeekResponse(event),
-      "household_calendar_week_response",
-    ).catch((error) => {
-      this._responseSubscription = null;
-      console.error("Household Calendar response subscription failed", error);
-    });
-  }
-
-  _handleWeekResponse(event) {
-    const data = event?.data || {};
-    if (data.request_id !== this._requestId || data.monday !== this._weekStart) return;
-    this._weekAttributes = { monday: data.monday, events: data.events || [] };
+  _applyServiceResponse(result, monday) {
+    const response = result?.response;
+    if (this._weekStart !== monday || response?.monday !== monday) return;
+    this._weekAttributes = { monday, events: response.events || [] };
+    this._requestError = null;
     for (const item of this._weekAttributes.events) {
       const key = this._eventKey(item);
       if (this._overrides.get(key) === item.paid) {
@@ -133,14 +121,20 @@ class HouseholdCalendarCard extends HTMLElement {
 
   _requestWeek(monday) {
     this._weekAttributes = null;
+    this._requestError = null;
     this._lastRequested = monday;
-    this._requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const requestId = this._requestId;
-    Promise.resolve(this._responseSubscription).then(() => this._hass.callWS({
-      type: "fire_event",
-      event_type: "household_calendar_week_requested",
-      event_data: { monday, request_id: requestId },
-    })).catch((error) => console.error("Household Calendar week request failed", error));
+    this._hass.callWS({
+      type: "call_service",
+      domain: "household_calendar",
+      service: "get_week",
+      service_data: { monday },
+      return_response: true,
+    }).then((result) => this._applyServiceResponse(result, monday)).catch((error) => {
+      console.error("Household Calendar week request failed", error);
+      if (this._weekStart !== monday) return;
+      this._requestError = `Could not load events: ${error?.message || error}`;
+      this._render(null);
+    });
   }
 
   _eventKey(event) {
@@ -169,18 +163,24 @@ class HouseholdCalendarCard extends HTMLElement {
     this._overrides.set(key, paid);
     this._pending.add(key);
     this._render(attrs);
+    const monday = this._weekStart;
     const retryTimer = window.setTimeout(() => {
       if (!this._pending.delete(key)) return;
       this._overrides.delete(key);
       this._render(this._weekAttributes);
-    }, 10000);
+    }, 35000);
     this._hass.callWS({
-      type: "fire_event",
-      event_type: "household_calendar_paid",
-      event_data: {
+      type: "call_service",
+      domain: "household_calendar",
+      service: "set_paid",
+      service_data: {
         event_id: eventId, due_date: dueDate, paid,
-        monday: this._weekStart, request_id: this._requestId,
+        monday,
       },
+      return_response: true,
+    }).then((result) => {
+      window.clearTimeout(retryTimer);
+      this._applyServiceResponse(result, monday);
     }).catch((error) => {
       console.error("Household Calendar paid-state update failed", error);
       window.clearTimeout(retryTimer);
@@ -202,6 +202,10 @@ class HouseholdCalendarCard extends HTMLElement {
     range.textContent = `${new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(startDate)} – ${new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(sundayDate)}`;
 
     if (!attributes) {
+      if (this._requestError) {
+        content.innerHTML = `<div class="message">${this._escape(this._requestError)}</div>`;
+        return;
+      }
       content.innerHTML = '<div class="message">Loading events…</div>';
       return;
     }

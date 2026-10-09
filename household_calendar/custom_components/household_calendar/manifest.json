@@ -1,0 +1,10 @@
+{
+  "domain": "household_calendar",
+  "name": "Household Calendar",
+  "codeowners": [],
+  "config_flow": false,
+  "documentation": "https://github.com/Krbielec/calendar",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "0.4.0"
+}

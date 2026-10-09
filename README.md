@@ -12,13 +12,19 @@ A Home Assistant add-on for a weekly, day-grouped calendar of household events s
 
 ## Lovelace card
 
-The add-on copies and registers its card automatically. Add a manual card to a dashboard with:
+The add-on copies and registers its card automatically. It also installs the `household_calendar` Home Assistant integration under `/config/custom_components`. On first install of version 0.4.0 or later, add this top-level entry to `configuration.yaml` (merge it with any existing keys) and restart Home Assistant once to load the integration:
+
+```yaml
+household_calendar:
+```
+
+Then add a manual card to a dashboard with:
 
 ```yaml
 type: custom:household-calendar-card
 ```
 
-The add-on publishes the current week as `sensor.household_calendar_week`. The card requests other weeks over Home Assistant's authenticated WebSocket event bus and receives a correlated response, so each dashboard can display a different week independently. Paid-state changes use the same request/reply path and are written to the local SQLite database.
+The add-on publishes the current week as `sensor.household_calendar_week`. The card uses the integration's `get_week` and `set_paid` response services, so authenticated non-admin users can navigate independently and mark occurrences paid. The integration relays requests to the add-on and returns the matching response to each caller; paid-state changes are written to the local SQLite database.
 
 ## Manage events
 

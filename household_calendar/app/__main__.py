@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import signal
 from datetime import datetime
 from pathlib import Path
@@ -20,7 +21,9 @@ OPTIONS_PATH = Path("/data/options.json")
 DATABASE_PATH = Path("/data/calendar.sqlite3")
 CARD_SOURCE = Path("/app/www/household-calendar-card.js")
 CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
-ADDON_VERSION = "0.3.1"
+INTEGRATION_SOURCE = Path("/app/custom_components/household_calendar")
+INTEGRATION_DESTINATION = Path("/config/custom_components/household_calendar")
+ADDON_VERSION = "0.4.0"
 
 
 async def run() -> None:
@@ -39,6 +42,8 @@ async def run() -> None:
     LOG.info("Database ready; configured timezone: %s", options["timezone"])
     CARD_DESTINATION.parent.mkdir(parents=True, exist_ok=True)
     CARD_DESTINATION.write_bytes(CARD_SOURCE.read_bytes())
+    shutil.copytree(INTEGRATION_SOURCE, INTEGRATION_DESTINATION, dirs_exist_ok=True)
+    LOG.info("Installed Household Calendar Home Assistant integration files")
 
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
