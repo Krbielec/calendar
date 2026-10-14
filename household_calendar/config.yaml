@@ -16,7 +16,9 @@ arch:
   - amd64
   - aarch64
 map:
-  - config:rw
+  - type: homeassistant_config
+    read_only: false
+    path: /config
 options:
   timezone: "Europe/Warsaw"
 schema:
