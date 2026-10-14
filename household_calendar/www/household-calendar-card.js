@@ -11,6 +11,8 @@ class HouseholdCalendarCard extends HTMLElement {
 
   setConfig(config) {
     this.config = config || {};
+    const title = this.shadowRoot?.querySelector(".card-title");
+    if (title) title.textContent = this.config.title || "Household calendar";
   }
 
   set hass(hass) {
@@ -67,11 +69,12 @@ class HouseholdCalendarCard extends HTMLElement {
         .day { min-width:0; border:1px solid var(--divider-color); border-radius:8px; padding:8px; background:var(--card-background-color); }
         .day.today { border-color:var(--primary-color); }
         .day-heading { margin-bottom:8px; font-size:.8em; font-weight:700; color:var(--secondary-text-color); text-transform:uppercase; }
-        .event { margin:6px 0; padding:8px; border-radius:7px; background:var(--secondary-background-color); overflow-wrap:anywhere; }
+        .event { margin:6px 0; padding:8px; border-radius:7px; background:var(--disabled-color,#616161); color:var(--primary-text-color); overflow-wrap:anywhere; }
+        .event.paid { background:var(--success-color,#2e7d32); color:#fff; }
         .event.paid .event-name { text-decoration:line-through; opacity:.65; }
-        .event-name { font-size:.9em; line-height:1.3; margin-bottom:7px; }
-        .paid { width:100%; min-height:30px; padding:5px 7px; color:var(--primary-text-color); background:var(--divider-color); font-size:.78em; }
-        .event.paid .paid { background:var(--success-color,#2e7d32); color:#fff; }
+        .event-name { display:block; width:100%; padding:4px 0; border:0; background:transparent; color:inherit; font:inherit; font-size:.9em; line-height:1.3; text-align:left; cursor:pointer; }
+        .event-name:focus-visible { outline:2px solid currentColor; outline-offset:2px; border-radius:3px; }
+        .event-name:disabled { cursor:wait; }
         .empty, .message { color:var(--secondary-text-color); font-size:.8em; }
         .message { text-align:center; padding:18px 4px; }
         @media (max-width:700px) {
@@ -83,11 +86,12 @@ class HouseholdCalendarCard extends HTMLElement {
       <ha-card>
         <div class="header">
           <button class="nav" data-action="previous" aria-label="Previous week">‹</button>
-          <div class="title"><div>Household calendar</div><div class="range"></div></div>
+          <div class="title"><div class="card-title">Household calendar</div><div class="range"></div></div>
           <button class="nav" data-action="next" aria-label="Next week">›</button>
         </div>
         <div class="content"></div>
       </ha-card>`;
+    root.querySelector(".card-title").textContent = this.config?.title || "Household calendar";
     root.addEventListener("click", (event) => this._handleClick(event));
   }
 
@@ -228,9 +232,8 @@ class HouseholdCalendarCard extends HTMLElement {
         const paid = this._overrides.has(key) ? this._overrides.get(key) : event.paid;
         const pending = this._pending.has(key);
         return `<div class="event ${paid ? "paid" : ""}">
-          <div class="event-name">${this._escape(event.title)}</div>
-          <button class="paid" data-event-id="${Number(event.id)}" data-event-date="${this._escape(event.date)}" ${pending ? "disabled" : ""}>
-            ${pending ? "Saving…" : paid ? "Paid · undo" : "Mark paid"}
+          <button class="event-name" data-event-id="${Number(event.id)}" data-event-date="${this._escape(event.date)}" aria-label="${paid ? "Mark unpaid" : "Mark paid"}: ${this._escape(event.title)}" ${pending ? "disabled" : ""}>
+            ${this._escape(event.title)}${pending ? " (saving…)" : ""}
           </button>
         </div>`;
       }).join("");

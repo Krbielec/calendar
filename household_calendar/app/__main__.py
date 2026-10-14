@@ -23,7 +23,7 @@ CARD_SOURCE = Path("/app/www/household-calendar-card.js")
 CARD_DESTINATION = Path("/config/www/household_calendar/household-calendar-card.js")
 INTEGRATION_SOURCE = Path("/app/custom_components/household_calendar")
 INTEGRATION_DESTINATION = Path("/config/custom_components/household_calendar")
-ADDON_VERSION = "0.4.0"
+ADDON_VERSION = "0.4.1"
 
 
 async def run() -> None:

@@ -22,7 +22,10 @@ Then add a manual card to a dashboard with:
 
 ```yaml
 type: custom:household-calendar-card
+title: Household bills
 ```
+
+The optional `title` field changes the heading shown at the top of the card. If omitted, it defaults to `Household calendar`.
 
 The add-on publishes the current week as `sensor.household_calendar_week`. The card uses the integration's `get_week` and `set_paid` response services, so authenticated non-admin users can navigate independently and mark occurrences paid. The integration relays requests to the add-on and returns the matching response to each caller; paid-state changes are written to the local SQLite database.
 
